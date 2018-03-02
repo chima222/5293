@@ -1,0 +1,76 @@
+---
+title: "5293 P2"
+output:
+  html_document: default
+  pdf_document: default
+---
+#Multivarate linear regression (OLS):Predict CPI-U
+```{r}
+setwd('~/Desktop/5293/hw1')
+library("DAAG")
+library("rpart")
+#Run multivarate linear regression on pre-selected data for further selection
+cpi_raw = read.csv("cpiudata.whole.csv",header = T)[1:60,2:12]
+lm.raw = lm(All.items~.,data = cpi_raw)
+summary(lm.raw)
+#Select 5 variables with smallest p-value
+cpi_1 = cpi_raw[,-c(4,5,6,7,11)]
+```
+
+```{r}
+#Run multivarate linear regression on 5 selected independent varaiables, predict CPI-U on 60 months（Jan 2013-Dec 2017), and run cross validation
+lm.fit = lm(All.items~.,data = cpi_1)
+cpiu_predict = predict(lm.fit,cpi_1)
+cv.lm(data = cpi_1,form.lm = lm.fit,m=5,dots = 16)
+summary(lm.fit)
+mse = mean((cpi_1$All.items-cpiu_predict)^2)
+print(mse)
+
+
+
+```
+
+#CART:Inflation Up and Down
+```{r}
+#Create direction for CPI-U
+cpi_2=cpi_1
+cpi_2$Direction = NA
+for (i in 1:59){
+  if (cpi_2[i,1] < cpi_2[i+1,1]){
+    cpi_2[i+1,7] = "Up"
+  }
+  else
+    cpi_2[i+1,7] = "Down"
+}
+```
+
+```{r}
+#Run decision tree
+cpi_3 = cpi_2[2:60,2:7]
+
+fit = rpart(Direction~.,data = cpi_3,method = "class")
+
+printcp(fit) # display the results 
+plotcp(fit) # visualize cross-validation results 
+summary(fit) # detailed summary of splits
+missrate = 20/59*1*1
+accuracy = 1-missrate # accuracy rate of decision tree
+print(accuracy)
+
+pfit = prune(fit,cp=fit$cptable[which.min(fit$cptable[,"xerror"]),"CP"])
+pfit.pre = predict(pfit,type = "class")
+
+#confusion matrix
+conf.fit = table(cpi_3$Direction, pfit.pre)
+rownames(conf.fit) <- paste("Actual", rownames(conf.fit), sep = ":")
+colnames(conf.fit) <- paste("Pred", colnames(conf.fit), sep = ":")
+print(conf.fit)
+
+# plot tree 
+plot(fit, uniform=TRUE, 
+  	main="Classification Tree for Kyphosis")
+text(fit, use.n=TRUE, all=TRUE, cex=.8)
+
+```
+
+
